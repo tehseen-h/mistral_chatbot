@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.vscode
+.idea
+__pycache__
+*.pyc
+frontend/
+nixpacks.toml
+Procfile
+README.md
+LICENSE
+*.md
