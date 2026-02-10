@@ -50,6 +50,28 @@ class Settings:
         "=== END SECURITY RULES ===\n"
     )
 
+    # ── Thinking mode addendum ───────────────────────────
+    THINKING_ADDENDUM: str = (
+        "\n\n=== THINKING MODE (ACTIVE) ===\n"
+        "The user has enabled thinking mode. You MUST structure your ENTIRE response in exactly this format:\n\n"
+        "<think>\n"
+        "Write your detailed internal chain-of-thought reasoning here. This section should include:\n"
+        "- What the user is asking and what they really need\n"
+        "- Relevant context from the conversation history\n"
+        "- Different approaches or angles to consider\n"
+        "- Potential edge cases, caveats, or things to watch out for\n"
+        "- Your reasoning process for arriving at the best answer\n"
+        "- Any assumptions you're making\n"
+        "Be thorough and genuine in your thinking — show real reasoning, not a summary.\n"
+        "Write at least several paragraphs of genuine thought.\n"
+        "</think>\n\n"
+        "Then write your actual polished answer here, AFTER the closing </think> tag.\n"
+        "The answer should be clear, well-structured, and complete — as if the thinking section didn't exist.\n"
+        "CRITICAL: You MUST include both <think>...</think> AND the answer after it. "
+        "Never skip the thinking section. Never put the answer inside the think tags.\n"
+        "=== END THINKING MODE ===\n"
+    )
+
     @property
     def allowed_origins(self) -> list[str]:
         origins = ["http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:8080"]

@@ -51,7 +51,7 @@ class Session:
 
         return msg
 
-    def get_api_messages(self, project_instructions: str = "") -> List[Dict[str, str]]:
+    def get_api_messages(self, project_instructions: str = "", thinking: bool = False) -> List[Dict[str, str]]:
         """Return the conversation formatted for the Mistral API."""
         system_content = settings.SYSTEM_PROMPT
         if project_instructions:
@@ -60,6 +60,8 @@ class Session:
                 f"{project_instructions}\n"
                 "=== END PROJECT INSTRUCTIONS ===\n"
             )
+        if thinking:
+            system_content += settings.THINKING_ADDENDUM
         system = [{"role": "system", "content": system_content}]
         history = [m.to_api_format() for m in self.messages]
         return system + history

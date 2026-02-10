@@ -143,7 +143,20 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
           </button>
         </div>
-        <p class="input-hint"><kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+        <div class="input-bottom-row">
+          <!-- Thinking toggle -->
+          <div class="thinking-toggle" id="thinkingToggle" title="Toggle thinking mode">
+            <button type="button" class="think-option active" data-mode="quick">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Quick
+            </button>
+            <button type="button" class="think-option" data-mode="thinking">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><path d="M9 22h6"/></svg>
+              Think
+            </button>
+          </div>
+          <p class="input-hint"><kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+        </div>
       </form>
     </div>
   </main>

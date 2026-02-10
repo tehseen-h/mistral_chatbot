@@ -824,6 +824,153 @@ a:hover { text-decoration: underline; }
   background: var(--bg-glass-d);
 }
 
+/* ─── Input bottom row ──────────────────────────────────── */
+.input-bottom-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 6px;
+  gap: 10px;
+}
+
+/* ─── Thinking Toggle ───────────────────────────────────── */
+.thinking-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-glass-d);
+  border: 1px solid var(--border);
+  gap: 2px;
+}
+.think-option {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 0.76rem; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.think-option:hover { color: var(--text-2); }
+.think-option.active {
+  background: var(--bg-glass-s);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.think-option.active[data-mode="thinking"] {
+  background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(162,155,254,0.15));
+  color: var(--accent);
+}
+
+/* ═══ THINKING BLOCK (in messages) ══════════════════════ */
+.thinking-block {
+  margin-bottom: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass-d);
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+.thinking-block.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.thinking-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+.thinking-header:hover { background: var(--accent-soft); }
+
+.thinking-brain {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent-glow));
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.thinking-block.active .thinking-brain {
+  animation: brainPulse 1.5s ease-in-out infinite;
+}
+@keyframes brainPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%      { transform: scale(1.1); box-shadow: 0 0 12px 4px var(--accent-glow); }
+}
+
+.thinking-label {
+  flex: 1;
+  font-size: 0.8rem; font-weight: 600;
+  color: var(--accent);
+}
+.thinking-label .thinking-time {
+  font-weight: 400; font-size: 0.72rem; color: var(--text-3);
+  margin-left: 6px;
+}
+
+.thinking-chevron {
+  color: var(--text-3);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+.thinking-block.expanded .thinking-chevron { transform: rotate(180deg); }
+
+/* Sparkle animation while thinking is in progress */
+.thinking-sparkles {
+  display: flex; align-items: center; gap: 3px;
+  margin-left: 4px;
+}
+.thinking-sparkles .sparkle {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.4;
+  animation: sparkleFade 1.4s ease-in-out infinite;
+}
+.thinking-sparkles .sparkle:nth-child(2) { animation-delay: 0.2s; }
+.thinking-sparkles .sparkle:nth-child(3) { animation-delay: 0.4s; }
+@keyframes sparkleFade {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.2); }
+}
+
+/* Thinking content */
+.thinking-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.thinking-block.expanded .thinking-content {
+  max-height: 2000px;
+}
+.thinking-content-inner {
+  padding: 0 14px 12px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-2);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.thinking-content-inner p { margin-bottom: 8px; }
+.thinking-content-inner p:last-child { margin-bottom: 0; }
+.thinking-content-inner ul, .thinking-content-inner ol {
+  margin: 6px 0 6px 18px;
+}
+.thinking-content-inner li { margin-bottom: 3px; }
+.thinking-content-inner code {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+}
+
 /* ═══ PROJECT MODAL ═════════════════════════════════════ */
 .modal-overlay {
   position: fixed; inset: 0;

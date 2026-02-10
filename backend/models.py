@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(None, description="Existing session ID (omit to create new)")
     file_ids: Optional[List[str]] = Field(None, description="IDs of uploaded files to include")
     project_id: Optional[str] = Field(None, description="Project ID to scope session under")
+    thinking: bool = Field(False, description="Enable chain-of-thought thinking mode")
 
 
 class SessionRenameRequest(BaseModel):

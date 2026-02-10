@@ -191,11 +191,11 @@ async def chat(req: ChatRequest):
 
     # Get project instructions if applicable
     project_instructions = session_manager.get_project_instructions(session.project_id)
-    api_msgs = session.get_api_messages(project_instructions)
+    api_msgs = session.get_api_messages(project_instructions, thinking=req.thinking)
     api_msgs[-1] = _build_user_message(safe_message, req.file_ids)
 
     try:
-        reply = await mistral_client.chat(api_msgs)
+        reply = await mistral_client.chat(api_msgs, thinking=req.thinking)
     except Exception as e:
         session.messages.pop()
         raise HTTPException(status_code=502, detail=f"Mistral API error: {str(e)}")
@@ -210,31 +210,62 @@ async def chat(req: ChatRequest):
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(req: ChatRequest):
-    """Send a message and receive the response as Server-Sent Events."""
-    session = session_manager.get_or_create(req.session_id, project_id=req.project_id)
+async def chat_stream(request: Request):
+    """Send a message and receive the response as Server-Sent Events.
+
+    Accepts multipart/form-data so files can be uploaded alongside the message.
+    Fields: message, session_id?, project_id?, thinking?, files?
+    """
+    form = await request.form()
+    message = form.get("message", "") or ""
+    session_id = form.get("session_id") or None
+    project_id = form.get("project_id") or None
+    thinking_raw = form.get("thinking", "false")
+    thinking = thinking_raw in ("true", "1", True)
+
+    # Process uploaded files
+    file_ids: list[str] = []
+    uploaded_files = form.getlist("files") if hasattr(form, "getlist") else []
+    # form.multi_items() gives all (key, value) pairs
+    if not uploaded_files:
+        uploaded_files = [v for k, v in form.multi_items() if k == "files"]
+    for uf in uploaded_files:
+        if hasattr(uf, "read"):
+            content = await uf.read()
+            if len(content) > MAX_FILE_SIZE:
+                continue
+            if not uf.filename:
+                continue
+            try:
+                processed = process_file(content, uf.filename)
+                fid = file_store.save(processed)
+                file_ids.append(fid)
+            except ValueError:
+                continue
+
+    session = session_manager.get_or_create(session_id, project_id=project_id)
 
     if not session.messages:
-        session.auto_title(req.message)
+        session.auto_title(message or "File analysis")
 
     # Sanitize against prompt injection
-    safe_message = _sanitize_message(req.message)
+    safe_message = _sanitize_message(message) if message else ""
 
-    display = _session_display_text(req.message, req.file_ids)
+    display = _session_display_text(message, file_ids if file_ids else None)
     session.add_message("user", display)
 
     # Get project instructions if applicable
     project_instructions = session_manager.get_project_instructions(session.project_id)
-    api_messages = session.get_api_messages(project_instructions)
-    api_messages[-1] = _build_user_message(safe_message, req.file_ids)
+    api_messages = session.get_api_messages(project_instructions, thinking=thinking)
+    api_messages[-1] = _build_user_message(safe_message or message, file_ids if file_ids else None)
 
     async def event_generator():
         full_reply = []
         try:
-            # Send session_id first so the frontend knows which session this belongs to
-            yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
+            # Send session info so the frontend knows which session this belongs to
+            yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id, 'title': session.title})}\n\n"
 
-            async for chunk in mistral_client.chat_stream(api_messages):
+            async for chunk in mistral_client.chat_stream(api_messages, thinking=thinking):
                 full_reply.append(chunk)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 

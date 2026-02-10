@@ -15,22 +15,24 @@ class MistralClient:
         self.client = Mistral(api_key=settings.MISTRAL_API_KEY)
         self.model = settings.MISTRAL_MODEL
 
-    async def chat(self, messages: list[dict]) -> str:
+    async def chat(self, messages: list[dict], thinking: bool = False) -> str:
         """Non-streaming chat completion — returns full assistant text."""
+        max_tokens = settings.MAX_TOKENS * 2 if thinking else settings.MAX_TOKENS
         response = await self.client.chat.complete_async(
             model=self.model,
             messages=messages,
-            max_tokens=settings.MAX_TOKENS,
+            max_tokens=max_tokens,
             temperature=settings.TEMPERATURE,
         )
         return response.choices[0].message.content
 
-    async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[str, None]:
+    async def chat_stream(self, messages: list[dict], thinking: bool = False) -> AsyncGenerator[str, None]:
         """Streaming chat completion — yields text chunks."""
+        max_tokens = settings.MAX_TOKENS * 2 if thinking else settings.MAX_TOKENS
         response = await self.client.chat.stream_async(
             model=self.model,
             messages=messages,
-            max_tokens=settings.MAX_TOKENS,
+            max_tokens=max_tokens,
             temperature=settings.TEMPERATURE,
         )
         async for event in response:
