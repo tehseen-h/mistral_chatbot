@@ -1,20 +1,16 @@
 /* ═══════════════════════════════════════════════════════════
-   Mistral Chatbot — Frontend Application Logic
+   Mistral AI — Frontend Application Logic
    ═══════════════════════════════════════════════════════════ */
 
 // ── API Base URL ───────────────────────────────────────────
-// For LOCAL dev  : leave empty (same-origin)
-// For PRODUCTION : set to your Railway backend URL, e.g.
-//   "https://your-app.up.railway.app"
 const BACKEND_URL = "https://web-production-de319.up.railway.app";
-
 const API = BACKEND_URL || window.location.origin;
 
 // ── State ──────────────────────────────────────────────────
 let currentSessionId = null;
 let isStreaming = false;
 let abortController = null;
-let pendingFiles = [];  // { file, status, file_id, filename, category, size }
+let pendingFiles = [];
 
 // ── DOM refs ───────────────────────────────────────────────
 const $messages      = document.getElementById('chatMessages');
@@ -33,6 +29,7 @@ const $deleteChatBtn = document.getElementById('deleteChatBtn');
 const $fileInput     = document.getElementById('fileInput');
 const $attachBtn     = document.getElementById('attachBtn');
 const $filePreview   = document.getElementById('filePreviewBar');
+const $searchInput   = document.getElementById('searchInput');
 
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,8 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // THEME
 // ═══════════════════════════════════════════════════════════
 function initTheme() {
-  const saved = localStorage.getItem('theme') || 'dark';
+  const saved = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', saved);
+  updateHljsTheme(saved);
 }
 
 function toggleTheme() {
@@ -54,26 +52,36 @@ function toggleTheme() {
   const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
+  updateHljsTheme(next);
+
+  // Re-initialize lucide icons after theme change
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function updateHljsTheme(theme) {
+  const link = document.getElementById('hljs-theme');
+  if (!link) return;
+  link.href = theme === 'dark'
+    ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'
+    : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
 }
 
 // ═══════════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ═══════════════════════════════════════════════════════════
 function setupEventListeners() {
-  // Form submit
   $form.addEventListener('submit', (e) => {
     e.preventDefault();
     sendMessage();
   });
 
-  // Auto-resize textarea
+  // Auto-resize textarea with smooth animation
   $input.addEventListener('input', () => {
     $input.style.height = 'auto';
     $input.style.height = Math.min($input.scrollHeight, 160) + 'px';
     updateSendButton();
   });
 
-  // Keyboard: Enter to send, Shift+Enter for newline
   $input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -95,12 +103,18 @@ function setupEventListeners() {
   });
 
   $themeToggle.addEventListener('click', toggleTheme);
-
   $deleteChatBtn.addEventListener('click', deleteCurrentChat);
 
   // File attachment
   $attachBtn.addEventListener('click', () => $fileInput.click());
   $fileInput.addEventListener('change', handleFileSelect);
+
+  // Search sessions
+  if ($searchInput) {
+    $searchInput.addEventListener('input', debounce(() => {
+      filterSessions($searchInput.value.trim());
+    }, 200));
+  }
 }
 
 function closeSidebar() {
@@ -111,31 +125,49 @@ function closeSidebar() {
 // ═══════════════════════════════════════════════════════════
 // SESSIONS
 // ═══════════════════════════════════════════════════════════
+let allSessions = [];
+
 async function loadSessions() {
   try {
     const res = await fetch(`${API}/api/sessions`);
     const data = await res.json();
-    renderSessionList(data.sessions);
+    allSessions = data.sessions;
+    renderSessionList(allSessions);
   } catch (e) {
     console.error('Failed to load sessions', e);
   }
 }
 
+function filterSessions(query) {
+  if (!query) {
+    renderSessionList(allSessions);
+    return;
+  }
+  const q = query.toLowerCase();
+  const filtered = allSessions.filter(s => s.title.toLowerCase().includes(q));
+  renderSessionList(filtered);
+}
+
 function renderSessionList(sessions) {
   $sessionList.innerHTML = '';
+
   if (sessions.length === 0) {
     $sessionList.innerHTML = `
-      <div style="padding:24px 12px;text-align:center;color:var(--text-tertiary);font-size:.8rem;">
+      <div style="padding:32px 16px;text-align:center;color:var(--text-tertiary);font-size:.82rem;">
+        <div style="margin-bottom:8px;opacity:0.5;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
         No conversations yet
       </div>`;
     return;
   }
 
-  sessions.forEach((s) => {
+  sessions.forEach((s, idx) => {
     const btn = document.createElement('button');
     btn.className = `session-item${s.session_id === currentSessionId ? ' active' : ''}`;
+    btn.style.animationDelay = `${idx * 30}ms`;
     btn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
       <span class="session-title">${escapeHtml(s.title)}</span>`;
@@ -155,11 +187,8 @@ async function loadSession(sessionId) {
 
     currentSessionId = sessionId;
     $chatTitle.textContent = data.title;
-
-    // Clear messages area
     $messages.innerHTML = '';
 
-    // Render all messages
     data.messages.forEach((m) => {
       appendMessage(m.role, m.content, m.timestamp, false);
     });
@@ -177,21 +206,46 @@ function startNewChat() {
   $chatTitle.textContent = 'New Chat';
   $messages.innerHTML = '';
 
-  // Re-add welcome screen
   $messages.innerHTML = `
     <div class="welcome" id="welcomeScreen">
+      <div class="welcome-glow"></div>
       <div class="welcome-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+          <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
         </svg>
       </div>
-      <h2>Welcome to Mistral Chat</h2>
-      <p>Start a conversation with one of the world's most capable AI models.</p>
+      <h2>Hello, how can I help?</h2>
+      <p>I'm Mistral, a powerful AI assistant. Ask me anything — from coding to creative writing.</p>
       <div class="suggestions">
-        <button class="suggestion" onclick="useSuggestion(this)">Explain quantum computing in simple terms</button>
-        <button class="suggestion" onclick="useSuggestion(this)">Write a Python function to sort a list</button>
-        <button class="suggestion" onclick="useSuggestion(this)">What are the best practices for REST API design?</button>
-        <button class="suggestion" onclick="useSuggestion(this)">Help me debug a JavaScript async issue</button>
+        <button class="suggestion" onclick="useSuggestion(this)" data-text="Explain quantum computing in simple terms anyone can understand">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
+          <div>
+            <strong>Explain quantum computing</strong>
+            <span>in simple terms anyone can understand</span>
+          </div>
+        </button>
+        <button class="suggestion" onclick="useSuggestion(this)" data-text="Write a Python function to sort a list efficiently">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+          <div>
+            <strong>Write a Python function</strong>
+            <span>to sort a list efficiently</span>
+          </div>
+        </button>
+        <button class="suggestion" onclick="useSuggestion(this)" data-text="What are the best practices for REST API design?">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+          <div>
+            <strong>REST API best practices</strong>
+            <span>design patterns and conventions</span>
+          </div>
+        </button>
+        <button class="suggestion" onclick="useSuggestion(this)" data-text="Help me debug a JavaScript async issue with promises">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>
+          <div>
+            <strong>Debug JavaScript async</strong>
+            <span>help me fix promise and await issues</span>
+          </div>
+        </button>
       </div>
     </div>`;
 
@@ -213,13 +267,7 @@ async function deleteCurrentChat() {
 
 function highlightActiveSession() {
   document.querySelectorAll('.session-item').forEach((el) => el.classList.remove('active'));
-  if (currentSessionId) {
-    document.querySelectorAll('.session-item').forEach((el) => {
-      const title = el.querySelector('.session-title');
-      // re-highlight from list refresh instead
-    });
-  }
-  loadSessions(); // refresh active state
+  loadSessions();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -345,21 +393,20 @@ async function sendMessage() {
   if (!text && fileIds.length === 0) return;
   if (isStreaming) return;
 
-  // Remove welcome screen
   const welcome = document.getElementById('welcomeScreen');
-  if (welcome) welcome.remove();
+  if (welcome) {
+    welcome.style.animation = 'fadeOut 0.3s ease forwards';
+    setTimeout(() => welcome.remove(), 300);
+  }
 
-  // Show user message with file badges
   appendMessage('user', text, new Date().toISOString(), true, fileInfos);
 
-  // Reset input & files
   $input.value = '';
   $input.style.height = 'auto';
   pendingFiles = [];
   renderFilePreview();
   $sendBtn.disabled = true;
 
-  // Show typing indicator
   const typingEl = showTypingIndicator();
 
   isStreaming = true;
@@ -381,10 +428,8 @@ async function sendMessage() {
       throw new Error(err.detail || `HTTP ${res.status}`);
     }
 
-    // Remove typing indicator
     typingEl.remove();
 
-    // Create assistant message placeholder
     const { contentEl, timeEl } = appendMessage('assistant', '', '', true);
 
     const reader = res.body.getReader();
@@ -445,9 +490,10 @@ function appendMessage(role, content, timestamp, animate = true, files = []) {
   row.className = `message-row ${role}`;
   if (!animate) row.style.animation = 'none';
 
-  const avatarText = role === 'user' ? 'You' : 'AI';
+  const avatarHtml = role === 'user'
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>';
 
-  // Build file badges HTML
   let filesHtml = '';
   if (files && files.length > 0) {
     const tags = files.map(f => {
@@ -464,7 +510,7 @@ function appendMessage(role, content, timestamp, animate = true, files = []) {
     : escapeHtml(content);
 
   row.innerHTML = `
-    <div class="message-avatar">${avatarText}</div>
+    <div class="message-avatar">${avatarHtml}</div>
     <div class="message-body">
       <div class="message-content">${filesHtml}${contentHtml}</div>
       <div class="message-time">${timestamp ? formatTime(timestamp) : ''}</div>
@@ -472,7 +518,6 @@ function appendMessage(role, content, timestamp, animate = true, files = []) {
 
   $messages.appendChild(row);
 
-  // Highlight code blocks in assistant messages
   if (role === 'assistant' && content) {
     const contentEl = row.querySelector('.message-content');
     highlightCodeBlocks(contentEl);
@@ -491,7 +536,11 @@ function showTypingIndicator() {
   row.className = 'message-row assistant';
   row.id = 'typingIndicator';
   row.innerHTML = `
-    <div class="message-avatar">AI</div>
+    <div class="message-avatar">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+      </svg>
+    </div>
     <div class="message-body">
       <div class="typing-indicator">
         <div class="typing-dot"></div>
@@ -528,16 +577,13 @@ function highlightCodeBlocks(container) {
   if (!container) return;
 
   container.querySelectorAll('pre code').forEach((block) => {
-    // Only process once
     if (block.dataset.highlighted) return;
     block.dataset.highlighted = 'true';
 
-    // Detect language
     const lang = [...block.classList]
       .find(c => c.startsWith('language-'))
       ?.replace('language-', '') || '';
 
-    // Add header with copy button
     const pre = block.parentElement;
     if (pre && !pre.querySelector('.code-header')) {
       const header = document.createElement('div');
@@ -553,7 +599,6 @@ function highlightCodeBlocks(container) {
       pre.insertBefore(header, block);
     }
 
-    // Apply hljs
     if (typeof hljs !== 'undefined') {
       try { hljs.highlightElement(block); } catch {}
     }
@@ -580,7 +625,10 @@ function formatTime(isoString) {
 
 function scrollToBottom() {
   requestAnimationFrame(() => {
-    $messages.scrollTop = $messages.scrollHeight;
+    $messages.scrollTo({
+      top: $messages.scrollHeight,
+      behavior: 'smooth'
+    });
   });
 }
 
@@ -589,7 +637,10 @@ function showError(msg) {
   toast.className = 'error-toast';
   toast.textContent = msg;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 5000);
+  setTimeout(() => {
+    toast.style.animation = 'fadeOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 4500);
 }
 
 function copyCode(btn) {
@@ -612,10 +663,24 @@ function copyCode(btn) {
   });
 }
 
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
 // Suggestion buttons
 function useSuggestion(btn) {
-  $input.value = btn.textContent;
+  const text = btn.dataset.text || btn.querySelector('strong')?.textContent || btn.textContent;
+  $input.value = text;
   $sendBtn.disabled = false;
   $input.focus();
   sendMessage();
 }
+
+// Additional CSS keyframe (injected via JS for fadeOut)
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `@keyframes fadeOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-8px); } }`;
+document.head.appendChild(styleSheet);
