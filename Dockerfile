@@ -3,14 +3,11 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install dependencies
-COPY backend/requirements.txt ./requirements.txt
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY backend/ ./backend/
-
-# Set working directory to backend
-WORKDIR /app/backend
+# Copy all backend code (Railway root is already set to backend/)
+COPY . .
 
 # Railway injects PORT env var
 ENV PORT=8080
