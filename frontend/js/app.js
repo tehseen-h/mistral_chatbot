@@ -6,7 +6,7 @@
 // For LOCAL dev  : leave empty (same-origin)
 // For PRODUCTION : set to your Railway backend URL, e.g.
 //   "https://your-app.up.railway.app"
-const BACKEND_URL = "";
+const BACKEND_URL = "https://web-production-de319.up.railway.app";
 
 const API = BACKEND_URL || window.location.origin;
 
