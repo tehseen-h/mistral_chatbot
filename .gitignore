@@ -1,0 +1,30 @@
+# ── Environment & Secrets ───────────────────
+.env
+
+# ── Python ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# ── Session persistence ────────────────────
+backend/_sessions.json
+
+# ── IDE / Editor ───────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── OS ─────────────────────────────────────
+desktop.ini
