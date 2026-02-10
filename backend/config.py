@@ -13,11 +13,17 @@ class Settings:
     MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
     MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
     HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "8000"))
+    PORT: int = int(os.getenv("PORT", "8080"))
+
+    # Deployment
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")  # e.g. https://your-app.vercel.app
 
     # Session defaults
     MAX_HISTORY_PER_SESSION: int = 50  # keep last N message pairs
     SESSION_TTL_HOURS: int = 24
+
+    # File upload
+    MAX_FILE_SIZE: int = 100 * 1024 * 1024  # 100 MB
 
     # Mistral generation defaults
     MAX_TOKENS: int = 4096
@@ -27,6 +33,13 @@ class Settings:
         "Provide clear, concise, and accurate answers. Use markdown formatting when appropriate. "
         "When sharing code, always wrap it in proper code blocks with the language specified."
     )
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        origins = ["http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:8080"]
+        if self.FRONTEND_URL:
+            origins.append(self.FRONTEND_URL.rstrip("/"))
+        return origins
 
 
 settings = Settings()

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10_000, description="User message")
     session_id: Optional[str] = Field(None, description="Existing session ID (omit to create new)")
+    file_ids: Optional[List[str]] = Field(None, description="IDs of uploaded files to include")
 
 
 class SessionRenameRequest(BaseModel):
@@ -38,6 +39,13 @@ class SessionInfo(BaseModel):
 
 class SessionListResponse(BaseModel):
     sessions: List[SessionInfo]
+
+
+class FileUploadResponse(BaseModel):
+    file_id: str
+    filename: str
+    category: str
+    size: int
 
 
 class SessionDetailResponse(BaseModel):

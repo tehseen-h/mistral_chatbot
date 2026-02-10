@@ -633,3 +633,153 @@ body {
 
 /* ── Utility ───────────────────────────────────────────── */
 .hidden { display: none !important; }
+
+/* ── File attachment ───────────────────────────────────── */
+.attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.attach-btn:hover { color: var(--accent); background: var(--bg-hover); }
+
+/* File preview bar above input */
+.file-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  animation: fadeIn .2s ease;
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: .78rem;
+  color: var(--text-primary);
+  animation: slideUp .2s ease;
+  max-width: 260px;
+}
+
+.file-chip .file-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.file-chip .file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.file-chip .file-size {
+  color: var(--text-tertiary);
+  font-size: .7rem;
+  white-space: nowrap;
+}
+
+.file-chip .file-status {
+  font-size: .7rem;
+  color: var(--text-tertiary);
+}
+
+.file-chip .file-status.uploading { color: var(--accent); }
+.file-chip .file-status.done { color: #22c55e; }
+.file-chip .file-status.error { color: var(--danger); }
+
+.file-chip .remove-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: .85rem;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+.file-chip .remove-file:hover { color: var(--danger); background: var(--bg-hover); }
+
+/* File attachment in message bubbles */
+.message-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.message-file-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 500;
+}
+
+.message-row.user .message-file-tag {
+  background: rgba(255,255,255,.18);
+  color: rgba(255,255,255,.9);
+}
+
+.message-row.assistant .message-file-tag {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.message-file-tag svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Image preview in messages */
+.message-image-preview {
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+.message-image-preview:hover { transform: scale(1.02); }
+
+/* Upload progress spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  flex-shrink: 0;
+}

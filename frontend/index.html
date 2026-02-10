@@ -90,8 +90,18 @@
 
     <!-- Input area -->
     <div class="chat-input-wrapper">
+      <!-- File preview bar -->
+      <div class="file-preview-bar hidden" id="filePreviewBar"></div>
+
       <form class="chat-input-form" id="chatForm">
         <div class="input-container">
+          <input type="file" id="fileInput" class="hidden" multiple
+            accept=".txt,.py,.js,.ts,.jsx,.tsx,.html,.css,.json,.xml,.yaml,.yml,.md,.csv,.log,.sh,.sql,.java,.c,.cpp,.h,.cs,.go,.rs,.php,.rb,.swift,.kt,.scala,.toml,.vue,.svelte,.dart,.lua,.png,.jpg,.jpeg,.gif,.webp,.bmp,.pdf" />
+          <button type="button" class="attach-btn" id="attachBtn" title="Attach file (max 100 MB)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
           <textarea
             id="messageInput"
             placeholder="Send a message…"
@@ -104,7 +114,7 @@
             </svg>
           </button>
         </div>
-        <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+        <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line · Max file size: 100 MB</p>
       </form>
     </div>
   </main>

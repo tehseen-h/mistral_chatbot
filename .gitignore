@@ -28,3 +28,7 @@ Thumbs.db
 
 # ── OS ─────────────────────────────────────
 desktop.ini
+
+# ── Deployment artifacts ───────────────────
+.vercel/
+node_modules/

@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import json
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,7 @@ from config import settings
 from models import (
     ChatRequest,
     ChatResponse,
+    FileUploadResponse,
     MessageOut,
     SessionDetailResponse,
     SessionInfo,
@@ -27,16 +28,106 @@ from models import (
 )
 from session_manager import session_manager
 from mistral_client import mistral_client
+from file_handler import process_file, file_store, MAX_FILE_SIZE, get_file_category
 
 # ── App setup ───────────────────────────────────────────────
-app = FastAPI(title="Mistral Chatbot", version="1.0.0")
+app = FastAPI(title="Mistral Chatbot", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+
+# ── File upload endpoint ────────────────────────────────────
+
+
+@app.post("/api/upload", response_model=FileUploadResponse)
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a file (max 100 MB). Returns a file_id to reference in chat."""
+    content = await file.read()
+
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(413, f"File too large. Max size is {MAX_FILE_SIZE // (1024*1024)} MB.")
+
+    if not file.filename:
+        raise HTTPException(400, "Filename is required.")
+
+    try:
+        processed = process_file(content, file.filename)
+    except ValueError as e:
+        raise HTTPException(415, str(e))
+
+    file_id = file_store.save(processed)
+
+    return FileUploadResponse(
+        file_id=file_id,
+        filename=processed["filename"],
+        category=processed["category"],
+        size=processed["size"],
+    )
+
+
+def _build_user_message(text: str, file_ids: list[str] | None) -> dict:
+    """Build a Mistral API user message, potentially multi-modal."""
+    if not file_ids:
+        return {"role": "user", "content": text}
+
+    content_parts = []
+    file_labels = []
+
+    for fid in file_ids:
+        fdata = file_store.get(fid)
+        if not fdata:
+            continue
+
+        if fdata["category"] == "image":
+            content_parts.append(
+                {"type": "image_url", "image_url": {"url": fdata["data_url"]}}
+            )
+            file_labels.append(f"[Image: {fdata['filename']}]")
+        elif fdata["category"] == "text":
+            # Inject text file content as context
+            file_text = fdata["text_content"]
+            if len(file_text) > 50_000:
+                file_text = file_text[:50_000] + "\n... (truncated)"
+            content_parts.append(
+                {"type": "text", "text": f"Content of {fdata['filename']}:\n```\n{file_text}\n```"}
+            )
+            file_labels.append(f"[File: {fdata['filename']}]")
+
+    # Add the user's own message
+    if text:
+        content_parts.append({"type": "text", "text": text})
+
+    # If only text parts (no images), flatten to a single string for efficiency
+    has_images = any(p.get("type") == "image_url" for p in content_parts)
+    if not has_images:
+        combined = "\n\n".join(p["text"] for p in content_parts if p.get("type") == "text")
+        return {"role": "user", "content": combined}
+
+    return {"role": "user", "content": content_parts}
+
+
+def _session_display_text(text: str, file_ids: list[str] | None) -> str:
+    """Build the text stored in session history (no base64 blobs)."""
+    parts = []
+    if file_ids:
+        for fid in file_ids:
+            fdata = file_store.get(fid)
+            if not fdata:
+                continue
+            if fdata["category"] == "image":
+                parts.append(f"\U0001f4ce Image: {fdata['filename']}")
+            else:
+                parts.append(f"\U0001f4ce File: {fdata['filename']}")
+    if text:
+        parts.append(text)
+    return "\n".join(parts) or text
 
 
 # ── Chat endpoints ─────────────────────────────────────────
@@ -51,18 +142,22 @@ async def chat(req: ChatRequest):
     if not session.messages:
         session.auto_title(req.message)
 
-    # Record user message
-    session.add_message("user", req.message)
+    # Build display text & API message
+    display = _session_display_text(req.message, req.file_ids)
+    session.add_message("user", display)
+
+    # Build the API messages (with multimodal content if files)
+    api_msgs = session.get_api_messages()
+    # Replace the last user message with the full file-aware version
+    api_msgs[-1] = _build_user_message(req.message, req.file_ids)
 
     # Call Mistral
     try:
-        reply = await mistral_client.chat(session.get_api_messages())
+        reply = await mistral_client.chat(api_msgs)
     except Exception as e:
-        # Roll back the user message on failure
         session.messages.pop()
         raise HTTPException(status_code=502, detail=f"Mistral API error: {str(e)}")
 
-    # Record assistant message
     assistant_msg = session.add_message("assistant", reply)
     session_manager.save()
 
@@ -80,8 +175,11 @@ async def chat_stream(req: ChatRequest):
     if not session.messages:
         session.auto_title(req.message)
 
-    session.add_message("user", req.message)
+    display = _session_display_text(req.message, req.file_ids)
+    session.add_message("user", display)
+
     api_messages = session.get_api_messages()
+    api_messages[-1] = _build_user_message(req.message, req.file_ids)
 
     async def event_generator():
         full_reply = []
