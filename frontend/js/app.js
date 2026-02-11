@@ -14,6 +14,7 @@ let pendingFiles = [];         // files waiting to be sent
 let isStreaming = false;
 let searchDebounce = null;
 let thinkingMode = false;      // Quick (false) / Thinking (true)
+let searchMode = false;        // Web search (false = off, true = on)
 
 // ─── DOM refs ────────────────────────────────────────────
 const $ = (s) => document.querySelector(s);
@@ -40,6 +41,7 @@ const filePreviewBar= $("#filePreviewBar");
 const projectBadge  = $("#projectBadge");
 const projectBadgeName = $("#projectBadgeName");
 const thinkingToggle = $("#thinkingToggle");
+const searchToggleBtn = $("#searchToggle");
 
 // Tabs
 const tabChats      = $("#tabChats");
@@ -105,6 +107,12 @@ thinkingToggle.querySelectorAll(".think-option").forEach(btn => {
     btn.classList.add("active");
     thinkingMode = btn.dataset.mode === "thinking";
   });
+});
+
+// ═══ SEARCH TOGGLE ═══════════════════════════════════════
+searchToggleBtn.addEventListener("click", () => {
+  searchMode = !searchMode;
+  searchToggleBtn.classList.toggle("active", searchMode);
 });
 
 // ═══ SIDEBAR (mobile) ════════════════════════════════════
@@ -641,6 +649,7 @@ async function sendMessage() {
   if (currentSessionId) formData.append("session_id", currentSessionId);
   if (currentProjectId) formData.append("project_id", currentProjectId);
   if (thinkingMode) formData.append("thinking", "true");
+  if (searchMode) formData.append("search", "true");
   pendingFiles.forEach(f => formData.append("files", f));
   pendingFiles = [];
   renderFilePreview();
@@ -670,9 +679,13 @@ async function sendMessage() {
   let thinkBlockEl = null;
   let thinkContentInnerEl = null;
   let answerEl = null;
+  let searchBlockEl = null;
 
   function initThinkingUI() {
-    contentEl.innerHTML = "";
+    // Remove loading dots but preserve search block
+    const dots = contentEl.querySelector(".thinking-indicator");
+    if (dots) dots.remove();
+
     // Create thinking block
     thinkBlockEl = document.createElement("div");
     thinkBlockEl.className = "thinking-block active expanded";
@@ -714,6 +727,80 @@ async function sendMessage() {
     thinkContentInnerEl.innerHTML = renderMarkdown(thinkBuffer);
   }
 
+  // ── Search UI helpers ──────────────────────────────────
+  function initSearchUI() {
+    // Remove loading dots
+    const dots = contentEl.querySelector(".thinking-indicator");
+    if (dots) dots.remove();
+
+    searchBlockEl = document.createElement("div");
+    searchBlockEl.className = "search-block active";
+    searchBlockEl.innerHTML = `
+      <div class="search-header">
+        <div class="search-globe">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+        </div>
+        <span class="search-label">Searching the web…<div class="search-dots"><div class="s-dot"></div><div class="s-dot"></div><div class="s-dot"></div></div></span>
+      </div>
+      <div class="search-query-display"></div>
+      <div class="search-sources"></div>`;
+    contentEl.insertBefore(searchBlockEl, contentEl.firstChild);
+    scrollToBottom();
+  }
+
+  function showSearchResults(query, sources) {
+    if (!searchBlockEl) return;
+
+    // Update header — done searching
+    searchBlockEl.classList.remove("active");
+    const sourceCount = sources.length;
+    searchBlockEl.querySelector(".search-label").innerHTML = `Searched ${sourceCount} source${sourceCount !== 1 ? "s" : ""}`;
+
+    // Show query
+    const queryEl = searchBlockEl.querySelector(".search-query-display");
+    queryEl.innerHTML = `<div class="search-query-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>"${escapeHtml(query)}"</div>`;
+
+    // Show source cards
+    const sourcesEl = searchBlockEl.querySelector(".search-sources");
+    if (sources.length > 0) {
+      sourcesEl.innerHTML = sources.map((s, i) => {
+        const domain = getDomain(s.url);
+        const faviconUrl = s.favicon || `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        re// ── Search events ──────────────────────────────
+          if (obj.type === "search_start") {
+            initSearchUI();
+            continue;
+          }
+
+          if (obj.type === "search_results") {
+            showSearchResults(obj.query || "", obj.sources || []);
+            continue;
+          }
+
+          if (obj.type === "search_error") {
+            if (searchBlockEl) {
+              searchBlockEl.classList.remove("active");
+              searchBlockEl.querySelector(".search-label").innerHTML = `Search unavailable`;
+            }
+            continue;
+          }
+
+          turn `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" class="source-card" style="animation-delay:${i * 0.06}s">
+          <img class="source-favicon" src="${escapeHtml(faviconUrl)}" alt="" width="16" height="16" onerror="this.style.display='none'" />
+          <div class="source-info">
+            <span class="source-title">${escapeHtml(s.title || domain)}</span>
+            <span class="source-url">${escapeHtml(domain)}</span>
+          </div>
+        </a>`;
+      }).join("");
+    }
+    scrollToBottom();
+  }
+
+  function getDomain(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
+  }
+
   try {
     const res = await fetch(`${BACKEND_URL}/api/chat/stream`, {
       method: "POST",
@@ -751,8 +838,18 @@ async function sendMessage() {
             if (!currentSessionId) currentSessionId = obj.session_id;
             if (obj.title) chatTitle.textContent = obj.title;
             continue;
-          }
-
+          }render markdown
+              // If search block exists, render answer separately after it
+              if (searchBlockEl) {
+                if (!answerEl) {
+                  answerEl = document.createElement("div");
+                  answerEl.className = "answer-content";
+                  contentEl.appendChild(answerEl);
+                }
+                answerEl.innerHTML = renderMarkdown(fullText);
+              } else {
+                contentEl.innerHTML = renderMarkdown(fullText);
+              }
           if (obj.type === "error") {
             // If thinking UI was initialized, finalize it and show error in answer area
             if (thinkBlockEl) {

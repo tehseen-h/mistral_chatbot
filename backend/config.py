@@ -14,6 +14,7 @@ class Settings:
     MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8080"))
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 
     # Deployment
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")  # e.g. https://your-app.vercel.app

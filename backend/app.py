@@ -34,6 +34,7 @@ from models import (
 )
 from session_manager import session_manager
 from mistral_client import mistral_client
+from tavily_client import tavily_client
 from file_handler import process_file, file_store, MAX_FILE_SIZE, get_file_category
 
 
@@ -222,6 +223,8 @@ async def chat_stream(request: Request):
     project_id = form.get("project_id") or None
     thinking_raw = form.get("thinking", "false")
     thinking = thinking_raw in ("true", "1", True)
+    search_raw = form.get("search", "false")
+    search_enabled = search_raw in ("true", "1", True)
 
     # Process uploaded files
     file_ids: list[str] = []
@@ -264,6 +267,29 @@ async def chat_stream(request: Request):
         try:
             # Send session info so the frontend knows which session this belongs to
             yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id, 'title': session.title})}\n\n"
+
+            # ── Web search (if enabled) ──────────────────────
+            if search_enabled and tavily_client.available and message:
+                yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
+
+                try:
+                    search_data = await tavily_client.search(message, max_results=5, search_depth="basic")
+
+                    sources = [
+                        {"title": r["title"], "url": r["url"], "favicon": r.get("favicon", "")}
+                        for r in search_data.get("results", [])
+                    ]
+                    yield f"data: {json.dumps({'type': 'search_results', 'query': search_data.get('query', message), 'sources': sources})}\n\n"
+
+                    # Inject search context into messages
+                    search_context = tavily_client.build_context(search_data)
+                    if search_context:
+                        # Insert search context as a system-level message right before the user's message
+                        api_messages.insert(-1, {"role": "user", "content": f"[SEARCH CONTEXT — use this to answer accurately]\n\n{search_context}"})
+                        api_messages.insert(-1, {"role": "assistant", "content": "I'll use these search results to provide an accurate, well-sourced answer."})
+
+                except Exception as search_err:
+                    yield f"data: {json.dumps({'type': 'search_error', 'detail': str(search_err)})}\n\n"
 
             async for chunk in mistral_client.chat_stream(api_messages, thinking=thinking):
                 full_reply.append(chunk)
